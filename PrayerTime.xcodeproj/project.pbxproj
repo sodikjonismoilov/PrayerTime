@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4246FD662FF74ADA000D9447 /* Adhan in Frameworks */ = {isa = PBXBuildFile; productRef = 4246FD652FF74ADA000D9447 /* Adhan */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4246FD462FF7485B000D9447 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4246FD662FF74ADA000D9447 /* Adhan in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +83,7 @@
 				4246FD3A2FF74859000D9447 /* PrayerTime */,
 				4246FD482FF7485B000D9447 /* PrayerTimeTests */,
 				4246FD522FF7485B000D9447 /* PrayerTimeUITests */,
+				4246FD642FF74ADA000D9447 /* Frameworks */,
 				4246FD392FF74859000D9447 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +96,13 @@
 				4246FD4F2FF7485B000D9447 /* PrayerTimeUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4246FD642FF74ADA000D9447 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -112,6 +125,7 @@
 			);
 			name = PrayerTime;
 			packageProductDependencies = (
+				4246FD652FF74ADA000D9447 /* Adhan */,
 			);
 			productName = PrayerTime;
 			productReference = 4246FD382FF74859000D9447 /* PrayerTime.app */;
@@ -195,6 +209,9 @@
 			);
 			mainGroup = 4246FD2F2FF74859000D9447;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4246FD632FF7491F000D9447 /* XCRemoteSwiftPackageReference "adhan-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4246FD392FF74859000D9447 /* Products */;
 			projectDirPath = "";
@@ -563,6 +580,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		4246FD632FF7491F000D9447 /* XCRemoteSwiftPackageReference "adhan-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/batoulapps/adhan-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4246FD652FF74ADA000D9447 /* Adhan */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4246FD632FF7491F000D9447 /* XCRemoteSwiftPackageReference "adhan-swift" */;
+			productName = Adhan;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4246FD302FF74859000D9447 /* Project object */;
 }
