@@ -87,6 +87,56 @@ final class PrayerClock: ObservableObject {
     }
 }
 
+// Tracks which prayers have been marked "prayed" for the current day. Persists via
+// UserDefaults, keyed per-day (e.g. "prayed-2026-7-3"), rather than Core Data/SwiftData —
+// this is a handful of strings, not a database's worth of data, so a plist-backed
+// key/value store is the right amount of machinery.
+final class PrayerTracker: ObservableObject {
+    @Published private(set) var prayedNames: Set<String> = []
+
+    private var cachedDayKey: String?
+
+    init() {
+        loadForToday()
+    }
+
+    func isPrayed(_ prayer: Prayer) -> Bool {
+        refreshIfDayChanged()
+        return prayedNames.contains(prayer.name)
+    }
+
+    func toggle(_ prayer: Prayer) {
+        refreshIfDayChanged()
+        if prayedNames.contains(prayer.name) {
+            prayedNames.remove(prayer.name)
+        } else {
+            prayedNames.insert(prayer.name)
+        }
+        UserDefaults.standard.set(Array(prayedNames), forKey: cachedDayKey!)
+    }
+
+    // Because the UserDefaults key is scoped to today's date, a new day simply reads
+    // an empty (never-written) key — that's the entire "reset marks each new day"
+    // behavior, no explicit clearing required.
+    private func refreshIfDayChanged() {
+        let key = Self.dayKey(for: Date())
+        if key != cachedDayKey {
+            loadForToday()
+        }
+    }
+
+    private func loadForToday() {
+        let key = Self.dayKey(for: Date())
+        cachedDayKey = key
+        prayedNames = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+    }
+
+    private static func dayKey(for date: Date) -> String {
+        let comps = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return "prayed-\(comps.year ?? 0)-\(comps.month ?? 0)-\(comps.day ?? 0)"
+    }
+}
+
 // Owns everything to do with local notifications: asking for permission, scheduling
 // today's prayer alerts, and re-scheduling once the day rolls over. `NSObject` + the
 // `UNUserNotificationCenterDelegate` conformance are needed only so we can be told
@@ -213,12 +263,30 @@ struct PrayerListView: View {
     let now = Date()
     var nextIndex: Int? { prayers.firstIndex { $0.time > now } }
 
+    // @StateObject here (not passed in from the App) because this view is the only
+    // place the tracker is used — no need to thread it through from above.
+    @StateObject private var tracker = PrayerTracker()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Today").font(.headline)
             ForEach(Array(prayers.enumerated()), id: \.element.id) { i, p in
                 HStack {
-                    Text(p.name).fontWeight(i == nextIndex ? .bold : .regular)
+                    if p.name == "Sunrise" {
+                        // Not a prayer — nothing to mark as prayed.
+                        Text(p.name).fontWeight(i == nextIndex ? .bold : .regular)
+                    } else {
+                        Button {
+                            tracker.toggle(p)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: tracker.isPrayed(p) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(tracker.isPrayed(p) ? .green : .secondary)
+                                Text(p.name).fontWeight(i == nextIndex ? .bold : .regular)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
                     Spacer()
                     Text(p.time, style: .time)
                         .foregroundStyle(i == nextIndex ? .primary : .secondary)
