@@ -19,7 +19,7 @@ func todaysPrayers() -> [Prayer] {
     let cal = Calendar(identifier: .gregorian)
     let comps = cal.dateComponents([.year, .month, .day], from: Date())
 
-    let coords = Coordinates(latitude: 35.78056, longitude: -78.6389) // ← CHANGE to your coordinates
+    let coords = Coordinates(latitude: 40.2601, longitude: -74.2746) // Freehold, NJ
     var params = CalculationMethod.northAmerica.params                 // ← your calc method
     params.madhab = .hanafi                                            // ← .hanafi shifts Asr later
 
