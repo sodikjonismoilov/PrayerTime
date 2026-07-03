@@ -228,16 +228,6 @@ final class NotificationScheduler: NSObject, UNUserNotificationCenterDelegate {
         scheduleMidnightRollover()
     }
 
-    func scheduleTestNotification() {
-        let content = UNMutableNotificationContent()
-        content.title = "Test notification"
-        content.body = "If you see this, the notification pipeline works."
-        content.sound = .default
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
-        let request = UNNotificationRequest(identifier: "test-notification", content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(request)
-    }
-
     // Without this delegate method, macOS silently drops alerts while PrayerTime is the
     // frontmost app. Returning .banner/.sound here tells it to show them anyway.
     func userNotificationCenter(
@@ -291,12 +281,6 @@ struct PrayerListView: View {
                     Text(p.time, style: .time)
                         .foregroundStyle(i == nextIndex ? .primary : .secondary)
                 }
-            }
-            Divider()
-            // Temporary: lets us confirm notifications actually show up without waiting
-            // for a real prayer time. Remove once Milestone 2 is verified.
-            Button("Test notification (5s)") {
-                NotificationScheduler.shared.scheduleTestNotification()
             }
             Divider()
             Button("Quit") { NSApplication.shared.terminate(nil) }
