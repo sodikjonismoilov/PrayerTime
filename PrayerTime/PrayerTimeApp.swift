@@ -249,6 +249,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 struct PrayerListView: View {
+    // Passed in (not owned here) as @ObservedObject: the App struct's @StateObject is
+    // the single source of truth for the clock's lifetime, this view just observes it —
+    // that's what lets the countdown below stay in sync with the menu bar label for free.
+    @ObservedObject var clock: PrayerClock
+
     let prayers = todaysPrayers()
     let now = Date()
     var nextIndex: Int? { prayers.firstIndex { $0.time > now } }
@@ -257,36 +262,110 @@ struct PrayerListView: View {
     // place the tracker is used — no need to thread it through from above.
     @StateObject private var tracker = PrayerTracker()
 
+    // Sunrise isn't something you "pray," so it's excluded from the prayed-count fraction —
+    // same reasoning as skipping it for notifications.
+    private var trackablePrayers: [Prayer] { prayers.filter { $0.name != "Sunrise" } }
+    private var prayedCount: Int { trackablePrayers.filter(tracker.isPrayed).count }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Today").font(.headline)
-            ForEach(Array(prayers.enumerated()), id: \.element.id) { i, p in
-                HStack {
-                    if p.name == "Sunrise" {
-                        // Not a prayer — nothing to mark as prayed.
-                        Text(p.name).fontWeight(i == nextIndex ? .bold : .regular)
-                    } else {
-                        Button {
-                            tracker.toggle(p)
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: tracker.isPrayed(p) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(tracker.isPrayed(p) ? .green : .secondary)
-                                Text(p.name).fontWeight(i == nextIndex ? .bold : .regular)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    Spacer()
-                    Text(p.time, style: .time)
-                        .foregroundStyle(i == nextIndex ? .primary : .secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            // .rounded is a system font *design*, not a new font — it just picks a
+            // softer, friendlier glyph variant of the same San Francisco typeface.
+            // Small touch, but it's what separates "styled" from "default UIKit-y."
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Today")
+                    .font(.system(.headline, design: .rounded))
+                Text(clock.labelText)
+                    .font(.system(.subheadline, design: .rounded).monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(spacing: 2) {
+                ForEach(Array(prayers.enumerated()), id: \.element.id) { i, p in
+                    prayerRow(p, isNext: i == nextIndex)
                 }
             }
+
             Divider()
+
+            Text("\(prayedCount) / \(trackablePrayers.count) prayed today")
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(.secondary)
+
+            Divider()
+
             Button("Quit") { NSApplication.shared.terminate(nil) }
+                .buttonStyle(.plain)
+                .font(.system(.callout, design: .rounded))
+                .foregroundStyle(.secondary)
         }
-        .padding(12)
-        .frame(width: 220)
+        .padding(14)
+        .frame(width: 240)
+    }
+
+    // Breaking the row out into its own @ViewBuilder keeps `body` readable and makes the
+    // "next prayer" background highlight (a RoundedRectangle behind the row's content)
+    // easy to reason about in one place instead of tangled into the ForEach.
+    @ViewBuilder
+    private func prayerRow(_ p: Prayer, isNext: Bool) -> some View {
+        HStack(spacing: 8) {
+            if p.name == "Sunrise" {
+                // Not a prayer — nothing to mark as prayed, so just plain text.
+                Text(p.name)
+                    .font(.system(.body, design: .rounded))
+            } else {
+                Button {
+                    tracker.toggle(p)
+                } label: {
+                    HStack(spacing: 8) {
+                        checkmark(prayed: tracker.isPrayed(p))
+                        Text(p.name)
+                            .font(.system(.body, design: .rounded))
+                            .fontWeight(isNext ? .semibold : .regular)
+                    }
+                    // SwiftUI only hit-tests visibly-drawn pixels by default — the
+                    // checkmark circle's Color.clear fill (when unprayed) and thin
+                    // strokeBorder ring aren't tappable on their own, so taps in the
+                    // empty circle's interior would silently do nothing without this.
+                    .contentShape(Rectangle())
+                }
+                // .plain strips the default button chrome (blue capsule background,
+                // press highlight) so it reads as a row you can tap, not a system button.
+                .buttonStyle(.plain)
+            }
+            Spacer()
+            Text(p.time, style: .time)
+                .font(.system(.body, design: .rounded).monospacedDigit())
+                .foregroundStyle(isNext ? .primary : .secondary)
+                .fontWeight(isNext ? .semibold : .regular)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            // The "next prayer" highlight: a tinted rounded rect behind just that row,
+            // rather than only relying on bold text — much more noticeable at a glance.
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isNext ? Color.accentColor.opacity(0.15) : Color.clear)
+        )
+    }
+
+    // A small custom checkbox instead of SF Symbols' checkmark.circle/circle pair:
+    // a filled accent-colored circle with a white checkmark reads as "done" more
+    // clearly than a green icon swap, and matches the row highlight's accent color.
+    @ViewBuilder
+    private func checkmark(prayed: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(prayed ? Color.accentColor : Color.clear)
+            Circle()
+                .strokeBorder(prayed ? Color.accentColor : Color.secondary.opacity(0.5), lineWidth: 1.5)
+            if prayed {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(width: 18, height: 18)
     }
 }
 
@@ -300,7 +379,7 @@ struct PrayerTimeApp: App {
 
     var body: some Scene {
         MenuBarExtra(clock.labelText, systemImage: "moon.stars") {
-            PrayerListView()
+            PrayerListView(clock: clock)
         }
         .menuBarExtraStyle(.window)
     }
