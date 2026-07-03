@@ -8,6 +8,7 @@
 import SwiftUI
 import Adhan
 import UserNotifications
+import Combine
 
 struct Prayer: Identifiable {
     let id = UUID()
@@ -36,12 +37,54 @@ func todaysPrayers() -> [Prayer] {
     ]
 }
 
-func nextPrayerLabel() -> String {
-    guard let next = todaysPrayers().first(where: { $0.time > Date() }) else {
-        return "Isha done"
+// `ObservableObject` + `@Published` is SwiftUI's way of saying "some outside class holds
+// state a view cares about, and the view should redraw itself whenever that state changes."
+// Without it, `todaysPrayers()`/`Date()` would only ever be read once, at whatever moment
+// the view happened to be constructed — which is exactly the staleness bug we're fixing.
+final class PrayerClock: ObservableObject {
+    @Published private(set) var labelText = "…"
+
+    private var timer: Timer?
+
+    // Recomputing PrayerTimes (solar position math) every second would be wasted work,
+    // since the times themselves don't change until the calendar day does. We cache
+    // today's list and only rebuild it when the day component changes.
+    private var cachedDay: Int?
+    private var cachedPrayers: [Prayer] = []
+
+    init() {
+        tick()
+        let timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.tick()
+        }
+        // .common keeps the timer firing while the dropdown menu is open, which otherwise
+        // pauses timers registered on the default run loop mode.
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
     }
-    let f = DateFormatter(); f.dateFormat = "h:mm"
-    return "\(next.name) \(f.string(from: next.time))"
+
+    private func tick() {
+        let now = Date()
+        let day = Calendar.current.component(.day, from: now)
+        if day != cachedDay {
+            cachedPrayers = todaysPrayers()
+            cachedDay = day
+        }
+
+        guard let next = cachedPrayers.first(where: { $0.time > now }) else {
+            labelText = "Isha done"
+            return
+        }
+        labelText = "\(next.name) in \(Self.countdown(to: next.time, from: now))"
+    }
+
+    private static func countdown(to target: Date, from now: Date) -> String {
+        let seconds = max(0, Int(target.timeIntervalSince(now)))
+        let h = seconds / 3600
+        let m = (seconds % 3600) / 60
+        let s = seconds % 60
+        return h > 0 ? String(format: "%dh %02dm", h, m) : String(format: "%d:%02d", m, s)
+    }
 }
 
 // Owns everything to do with local notifications: asking for permission, scheduling
@@ -198,9 +241,13 @@ struct PrayerListView: View {
 @main
 struct PrayerTimeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    // @StateObject (not @ObservedObject) because this App instance owns the clock's
+    // lifetime — it should be created once and live as long as the app does, not get
+    // torn down and recreated whenever SwiftUI happens to re-evaluate `body`.
+    @StateObject private var clock = PrayerClock()
 
     var body: some Scene {
-        MenuBarExtra(nextPrayerLabel(), systemImage: "moon.stars") {
+        MenuBarExtra(clock.labelText, systemImage: "moon.stars") {
             PrayerListView()
         }
         .menuBarExtraStyle(.window)
